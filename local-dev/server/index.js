@@ -188,6 +188,65 @@ app.get('/api/assets/:id', (req, res) => {
     }
 });
 
+// Get distinct values for filters
+app.get('/api/distinct-values', (req, res) => {
+    try {
+        const { field } = req.query;
+        const assets = readAssetsSheet();
+        
+        const values = [...new Set(assets.map(asset => asset[field]))].filter(Boolean);
+        res.json(values.sort());
+    } catch (error) {
+        logger(LOG_LEVELS.ERROR, 'Failed to get distinct values', error);
+        res.status(500).json({ error: 'Failed to get values' });
+    }
+});
+
+// Export endpoint
+app.get('/api/export', (req, res) => {
+    try {
+        const { field, value } = req.query;
+        let assets = readAssetsSheet();
+
+        // Apply filter if provided
+        if (field && value) {
+            assets = assets.filter(asset => asset[field] === value);
+        }
+
+        // Convert to CSV
+        const csvRows = [];
+        
+        // Add headers
+        if (assets.length > 0) {
+            csvRows.push(Object.keys(assets[0]).join(','));
+        }
+
+        // Add data rows
+        assets.forEach(asset => {
+            const values = Object.values(asset).map(val => {
+                // Handle values that need escaping
+                if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
+                    return `"${val.replace(/"/g, '""')}"`;
+                }
+                return val;
+            });
+            csvRows.push(values.join(','));
+        });
+
+        const csvData = csvRows.join('\n');
+
+        // Set response headers
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=asset-export-${new Date().toISOString().split('T')[0]}.csv`);
+        
+        // Send CSV data
+        res.send(csvData);
+    } catch (error) {
+        logger(LOG_LEVELS.ERROR, 'Export failed', error);
+        res.status(500).json({ error: 'Export failed' });
+    }
+});
+
 // Helper functions
 function generateAssetID(assets) {
     if (assets.length === 0) {

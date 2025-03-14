@@ -94,6 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('storage').placeholder = 'e.g., 512GB, 1TB';
 
     initializeSearch();
+    initializeExport();
 });
 
 // Initialize navigation
@@ -711,6 +712,99 @@ async function showAssetDetails(assetId) {
     } catch (error) {
         console.error('Error fetching asset details:', error);
         showNotification('Error fetching asset details. Please try again.', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Add these functions to your script.js
+
+function initializeExport() {
+    const exportButton = document.getElementById('exportButton');
+    const exportOptions = document.getElementById('exportOptions');
+    const filterField = document.getElementById('filterField');
+    const filterValue = document.getElementById('filterValue');
+    const downloadButton = document.getElementById('downloadCSV');
+    const exportTypeRadios = document.getElementsByName('exportType');
+
+    // Toggle export options
+    exportButton.addEventListener('click', () => {
+        exportOptions.classList.toggle('hidden');
+    });
+
+    // Handle export type change
+    exportTypeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const filterOptions = document.querySelector('.filter-options');
+            if (e.target.value === 'filtered') {
+                filterOptions.classList.remove('hidden');
+                updateFilterValues();
+            } else {
+                filterOptions.classList.add('hidden');
+            }
+        });
+    });
+
+    // Update filter values when field changes
+    filterField.addEventListener('change', updateFilterValues);
+
+    // Handle download
+    downloadButton.addEventListener('click', handleExport);
+}
+
+async function updateFilterValues() {
+    const filterField = document.getElementById('filterField');
+    const filterValue = document.getElementById('filterValue');
+    const field = filterField.value;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/distinct-values?field=${field}`);
+        if (!response.ok) throw new Error('Failed to fetch values');
+
+        const values = await response.json();
+        filterValue.innerHTML = values
+            .map(value => `<option value="${value}">${value}</option>`)
+            .join('');
+    } catch (error) {
+        console.error('Error fetching filter values:', error);
+        showNotification('Error loading filter values', 'error');
+    }
+}
+
+async function handleExport() {
+    showLoading();
+
+    try {
+        const exportType = document.querySelector('input[name="exportType"]:checked').value;
+        let url = `${API_BASE_URL}/export`;
+
+        if (exportType === 'filtered') {
+            const field = document.getElementById('filterField').value;
+            const value = document.getElementById('filterValue').value;
+            url += `?field=${encodeURIComponent(field)}&value=${encodeURIComponent(value)}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Export failed');
+
+        // Create blob from response
+        const blob = await response.blob();
+        const downloadUrl = window.URL.createObjectURL(blob);
+        const filename = `asset-export-${new Date().toISOString().split('T')[0]}.csv`;
+
+        // Create temporary link and trigger download
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+
+        showNotification('Export completed successfully');
+    } catch (error) {
+        console.error('Export error:', error);
+        showNotification('Error exporting data. Please try again.', 'error');
     } finally {
         hideLoading();
     }

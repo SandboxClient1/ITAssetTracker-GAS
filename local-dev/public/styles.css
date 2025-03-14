@@ -468,4 +468,114 @@ footer {
     .asset-details {
         grid-template-columns: 1fr;
     }
+}
+
+/* Updated Export Controls Styles */
+.export-controls {
+    margin: 20px 0;
+}
+
+.export-options {
+    margin-top: 15px;
+    padding: 20px;
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.export-options h4 {
+    margin: 0 0 20px 0;
+    color: #2c3e50;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.export-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.export-option {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.radio-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.radio-container input[type="radio"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.radio-container label {
+    margin: 0;
+    cursor: pointer;
+    font-weight: normal;
+    color: #2c3e50;
+}
+
+.filter-options {
+    margin-left: 26px; /* Aligns with radio button text */
+    display: flex;
+    gap: 15px;
+}
+
+.filter-options select {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 14px;
+    min-width: 200px;
+}
+
+#downloadCSV {
+    margin-top: 10px;
+    align-self: flex-start;
+    padding: 10px 20px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.3s ease;
+}
+
+#downloadCSV:hover {
+    background-color: #2980b9;
+}
+
+#exportButton {
+    padding: 10px 20px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    color: #2c3e50;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+}
+
+#exportButton:hover {
+    background-color: #e9ecef;
+}
+
+.hidden {
+    display: none !important;
 } 

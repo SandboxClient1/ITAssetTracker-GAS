@@ -46,6 +46,41 @@
               </div>
             </div>
             
+            <!-- Updated export controls section -->
+            <div class="export-controls">
+                <button id="exportButton" class="btn btn-secondary">
+                    <i class="fas fa-download"></i> Export Assets
+                </button>
+                <div class="export-options hidden" id="exportOptions">
+                    <h4>Export Options</h4>
+                    <div class="export-options-list">
+                        <div class="export-option">
+                            <div class="radio-container">
+                                <input type="radio" id="exportAll" name="exportType" value="all" checked>
+                                <label for="exportAll">Export All Assets</label>
+                            </div>
+                        </div>
+                        <div class="export-option">
+                            <div class="radio-container">
+                                <input type="radio" id="exportFiltered" name="exportType" value="filtered">
+                                <label for="exportFiltered">Export Filtered Assets</label>
+                            </div>
+                            <div class="filter-options hidden">
+                                <select id="filterField" class="form-select">
+                                    <option value="Status">Status</option>
+                                    <option value="Location">Location</option>
+                                    <option value="Asset Type">Asset Type</option>
+                                </select>
+                                <select id="filterValue" class="form-select"></select>
+                            </div>
+                        </div>
+                        <button id="downloadCSV" class="btn btn-primary">
+                            <i class="fas fa-file-download"></i> Download CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Charts Grid -->
             <div class="metric-charts">
               <div class="chart-container">
