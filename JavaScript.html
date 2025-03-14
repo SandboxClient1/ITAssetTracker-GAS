@@ -1,0 +1,329 @@
+<script>
+  // Global variables
+  let dropdownOptions = {};
+  let charts = {};
+  let chartsInitialized = false;
+  
+  // Initialize the application
+  document.addEventListener('DOMContentLoaded', function() {
+    // Show loading overlay
+    showLoading();
+    
+    // Initialize navigation
+    initNavigation();
+    
+    // Load dropdown options
+    loadDropdownOptions()
+      .then(() => {
+        // Load dashboard data
+        return loadDashboardData();
+      })
+      .then(() => {
+        // Hide loading overlay
+        hideLoading();
+      })
+      .catch(error => {
+        console.error('Error initializing app:', error);
+        hideLoading();
+        showNotification('Error loading application data. Please refresh the page.', 'error');
+      });
+    
+    // Initialize form submission
+    document.getElementById('assetForm').addEventListener('submit', handleFormSubmit);
+    
+    // Initialize notification close button
+    document.querySelector('.close-notification').addEventListener('click', function() {
+      document.getElementById('notification').style.display = 'none';
+    });
+  });
+  
+  // Initialize navigation
+  function initNavigation() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    
+    navLinks.forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        // Remove active class from all links and sections
+        navLinks.forEach(l => l.classList.remove('active'));
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        
+        // Add active class to clicked link
+        this.classList.add('active');
+        
+        // Show corresponding section
+        const sectionId = this.getAttribute('data-section');
+        document.getElementById(sectionId).classList.add('active');
+        
+        // If dashboard is selected, refresh the data
+        if (sectionId === 'dashboard') {
+          loadDashboardData();
+        }
+      });
+    });
+  }
+  
+  // Load dropdown options
+  function loadDropdownOptions() {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(options => {
+          dropdownOptions = options;
+          
+          // Populate asset type dropdown
+          const assetTypeSelect = document.getElementById('assetType');
+          options.assetTypes.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            option.textContent = type;
+            assetTypeSelect.appendChild(option);
+          });
+          
+          // Populate OS dropdown
+          const osSelect = document.getElementById('operatingSystem');
+          options.operatingSystems.forEach(os => {
+            const option = document.createElement('option');
+            option.value = os;
+            option.textContent = os;
+            osSelect.appendChild(option);
+          });
+          
+          // Populate location dropdown
+          const locationSelect = document.getElementById('location');
+          options.locations.forEach(location => {
+            const option = document.createElement('option');
+            option.value = location;
+            option.textContent = location;
+            locationSelect.appendChild(option);
+          });
+          
+          // Populate status dropdown
+          const statusSelect = document.getElementById('status');
+          options.statuses.forEach(status => {
+            const option = document.createElement('option');
+            option.value = status;
+            option.textContent = status;
+            statusSelect.appendChild(option);
+          });
+          
+          // Populate condition dropdown
+          const conditionSelect = document.getElementById('condition');
+          options.conditions.forEach(condition => {
+            const option = document.createElement('option');
+            option.value = condition;
+            option.textContent = condition;
+            conditionSelect.appendChild(option);
+          });
+          
+          resolve();
+        })
+        .withFailureHandler(error => {
+          console.error('Error loading dropdown options:', error);
+          reject(error);
+        })
+        .getDropdownOptions();
+    });
+  }
+  
+  // Load dashboard data
+  function loadDashboardData() {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(metrics => {
+          // Update total assets
+          document.getElementById('totalAssets').textContent = metrics.totalAssets;
+          
+          // Create or update charts - with a slight delay to ensure DOM is ready
+          setTimeout(() => {
+            createOrUpdateChart('assetsByTypeChart', 'doughnut', 'Assets by Type', metrics.assetsByType);
+            createOrUpdateChart('assetsByStatusChart', 'pie', 'Assets by Status', metrics.assetsByStatus);
+            createOrUpdateChart('assetsByOSChart', 'doughnut', 'Assets by OS', metrics.assetsByOS);
+            createOrUpdateChart('assetsByLocationChart', 'pie', 'Assets by Location', metrics.assetsByLocation);
+            chartsInitialized = true;
+            resolve();
+          }, 100);
+        })
+        .withFailureHandler(error => {
+          console.error('Error loading dashboard data:', error);
+          reject(error);
+        })
+        .getDashboardMetrics();
+    });
+  }
+  
+  // Create or update chart
+  function createOrUpdateChart(canvasId, type, label, data) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) {
+      console.error(`Canvas with ID ${canvasId} not found`);
+      return;
+    }
+    
+    const ctx = canvas.getContext('2d');
+    
+    // Prepare data for Chart.js
+    const labels = Object.keys(data);
+    const values = Object.values(data);
+    
+    // If no data, show a message
+    if (labels.length === 0) {
+      if (charts[canvasId]) {
+        charts[canvasId].destroy();
+        delete charts[canvasId];
+      }
+      
+      // Clear canvas and draw text
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '14px Arial';
+      ctx.fillStyle = '#7f8c8d';
+      ctx.textAlign = 'center';
+      ctx.fillText('No data available', canvas.width / 2, canvas.height / 2);
+      return;
+    }
+    
+    // Generate colors
+    const colors = generateColors(labels.length);
+    
+    if (charts[canvasId]) {
+      // Update existing chart
+      charts[canvasId].data.labels = labels;
+      charts[canvasId].data.datasets[0].data = values;
+      charts[canvasId].data.datasets[0].backgroundColor = colors;
+      charts[canvasId].update();
+    } else {
+      // Destroy any existing chart
+      if (Chart.getChart(canvas)) {
+        Chart.getChart(canvas).destroy();
+      }
+      
+      // Create new chart
+      charts[canvasId] = new Chart(ctx, {
+        type: type,
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: {
+              position: 'right',
+              labels: {
+                boxWidth: 12,
+                font: {
+                  size: 11
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+  
+  // Generate random colors for charts
+  function generateColors(count) {
+    const colors = [
+      '#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6',
+      '#1abc9c', '#d35400', '#34495e', '#16a085', '#c0392b',
+      '#27ae60', '#2980b9', '#8e44ad', '#f1c40f', '#e67e22'
+    ];
+    
+    // If we need more colors than in our predefined list, generate random ones
+    if (count > colors.length) {
+      for (let i = colors.length; i < count; i++) {
+        const r = Math.floor(Math.random() * 200);
+        const g = Math.floor(Math.random() * 200);
+        const b = Math.floor(Math.random() * 200);
+        colors.push(`rgb(${r}, ${g}, ${b})`);
+      }
+    }
+    
+    return colors.slice(0, count);
+  }
+  
+  // Handle form submission
+  function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    // Show loading overlay
+    showLoading();
+    
+    // Get form data
+    const formData = {
+      assetType: document.getElementById('assetType').value,
+      make: document.getElementById('make').value,
+      model: document.getElementById('model').value,
+      serialNumber: document.getElementById('serialNumber').value,
+      operatingSystem: document.getElementById('operatingSystem').value,
+      processor: document.getElementById('processor').value,
+      ram: document.getElementById('ram').value,
+      storage: document.getElementById('storage').value,
+      location: document.getElementById('location').value,
+      status: document.getElementById('status').value,
+      assignee: document.getElementById('assignee').value,
+      condition: document.getElementById('condition').value,
+      notes: document.getElementById('notes').value
+    };
+    
+    // Submit form data
+    google.script.run
+      .withSuccessHandler(assetID => {
+        // Hide loading overlay
+        hideLoading();
+        
+        // Show success notification
+        showNotification(`Asset registered successfully with ID: ${assetID}`);
+        
+        // Reset form
+        document.getElementById('assetForm').reset();
+        
+        // Refresh dashboard data
+        loadDashboardData();
+      })
+      .withFailureHandler(error => {
+        console.error('Error registering asset:', error);
+        hideLoading();
+        showNotification('Error registering asset. Please try again.', 'error');
+      })
+      .registerAsset(formData);
+  }
+  
+  // Show loading overlay
+  function showLoading() {
+    document.getElementById('loadingOverlay').style.display = 'flex';
+  }
+  
+  // Hide loading overlay
+  function hideLoading() {
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+  
+  // Show notification
+  function showNotification(message, type = 'success') {
+    const notification = document.getElementById('notification');
+    const notificationMessage = document.getElementById('notificationMessage');
+    
+    // Set message
+    notificationMessage.textContent = message;
+    
+    // Set notification type
+    notification.className = 'notification';
+    notification.classList.add(`notification-${type}`);
+    
+    // Show notification
+    notification.style.display = 'block';
+    
+    // Hide notification after 5 seconds
+    setTimeout(() => {
+      notification.style.display = 'none';
+    }, 5000);
+  }
+</script>
