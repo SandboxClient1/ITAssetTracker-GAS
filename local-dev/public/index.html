@@ -13,6 +13,7 @@
           <ul>
             <li><a href="#" class="nav-link active" data-section="dashboard">Dashboard</a></li>
             <li><a href="#" class="nav-link" data-section="register">Register Asset</a></li>
+            <li><a href="#" class="nav-link" data-section="search">Search Assets</a></li>
           </ul>
         </nav>
       </header>
@@ -166,6 +167,64 @@
               <button type="reset" class="btn btn-secondary">Reset</button>
             </div>
           </form>
+        </section>
+        
+        <!-- Search Assets Section -->
+        <section id="search" class="section">
+            <h2>Search Assets</h2>
+            <div class="search-container">
+                <div class="search-controls">
+                    <div class="search-field">
+                        <select id="searchField">
+                            <option value="">Select Search Field</option>
+                            <option value="Asset ID">Asset ID</option>
+                            <option value="Serial Number">Serial Number</option>
+                            <option value="Location">Location</option>
+                            <option value="Status">Status</option>
+                            <option value="Assignee">Assignee</option>
+                            <option value="Condition">Condition</option>
+                        </select>
+                    </div>
+                    <div class="search-input">
+                        <input type="text" id="searchValue" placeholder="Enter search value">
+                        <button id="searchButton" class="btn btn-primary">Search</button>
+                    </div>
+                </div>
+                
+                <div class="search-results">
+                    <div id="noResults" class="no-results hidden">No assets found matching your search criteria.</div>
+                    <div id="resultsTable" class="results-table hidden">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Asset ID</th>
+                                    <th>Type</th>
+                                    <th>Make</th>
+                                    <th>Model</th>
+                                    <th>Serial Number</th>
+                                    <th>Status</th>
+                                    <th>Location</th>
+                                    <th>Assignee</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="searchResults">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Asset Details Modal -->
+                <div id="assetModal" class="modal">
+                    <div class="modal-content">
+                        <span class="close">&times;</span>
+                        <h3>Asset Details</h3>
+                        <div id="assetDetails" class="asset-details">
+                            <!-- Details will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
         </section>
       </main>
       

@@ -8,6 +8,49 @@ const fs = require('fs');
 const app = express();
 const PORT = 3000;
 
+// Add this logging utility at the top of your server code
+const LOG_LEVELS = {
+    DEBUG: 'DEBUG',
+    INFO: 'INFO',
+    WARN: 'WARN',
+    ERROR: 'ERROR'
+};
+
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
+function logger(level, message, data = null) {
+    if (!isDevelopment) {
+        // In production, only log warnings and errors
+        if (level === LOG_LEVELS.WARN || level === LOG_LEVELS.ERROR) {
+            // Here you could implement production logging
+            // For example, writing to a log file or sending to a logging service
+        }
+        return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] ${level}: ${message}`;
+    
+    switch (level) {
+        case LOG_LEVELS.ERROR:
+            console.error(logMessage);
+            if (data) console.error(data);
+            break;
+        case LOG_LEVELS.WARN:
+            console.warn(logMessage);
+            if (data) console.warn(data);
+            break;
+        case LOG_LEVELS.INFO:
+            console.info(logMessage);
+            if (data) console.info(data);
+            break;
+        case LOG_LEVELS.DEBUG:
+            console.debug(logMessage);
+            if (data) console.debug(data);
+            break;
+    }
+}
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
@@ -89,6 +132,62 @@ app.get('/api/dropdowns', (req, res) => {
     });
 });
 
+// Search endpoint
+app.get('/api/search', (req, res) => {
+    try {
+        const { field, value } = req.query;
+        
+        if (!field || !value) {
+            return res.status(400).json({ error: 'Search field and value are required' });
+        }
+        
+        const assets = readAssetsSheet();
+        
+        const results = assets.filter(asset => {
+            const assetValue = asset[field];
+            if (assetValue === undefined || assetValue === null) return false;
+            
+            const searchValue = value.toString().toLowerCase().trim();
+            const fieldValue = assetValue.toString().toLowerCase().trim();
+            
+            return fieldValue.includes(searchValue);
+        });
+        
+        logger(LOG_LEVELS.DEBUG, `Search performed`, {
+            field,
+            value,
+            resultCount: results.length
+        });
+
+        res.json(results);
+    } catch (error) {
+        logger(LOG_LEVELS.ERROR, 'Search failed', error);
+        res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+// Get asset details endpoint
+app.get('/api/assets/:id', (req, res) => {
+    try {
+        const assetId = req.params.id;
+        const assets = readAssetsSheet();
+        
+        const asset = assets.find(a => a['Asset ID'] === assetId);
+        
+        if (!asset) {
+            logger(LOG_LEVELS.WARN, `Asset not found`, { assetId });
+            res.status(404).json({ error: 'Asset not found' });
+            return;
+        }
+        
+        logger(LOG_LEVELS.DEBUG, `Asset details retrieved`, { assetId });
+        res.json(asset);
+    } catch (error) {
+        logger(LOG_LEVELS.ERROR, 'Error fetching asset details', error);
+        res.status(500).json({ error: 'Failed to fetch asset details' });
+    }
+});
+
 // Helper functions
 function generateAssetID(assets) {
     if (assets.length === 0) {
@@ -131,5 +230,5 @@ function calculateDashboardMetrics(assets) {
 }
 
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    logger(LOG_LEVELS.INFO, `Server running at http://localhost:${PORT}`);
 }); 

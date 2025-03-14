@@ -33,6 +33,19 @@ const VALIDATION_RULES = {
     }
 };
 
+// Add this function near the top of your script.js file, after the global variables
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     // Show loading overlay
@@ -79,6 +92,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add placeholder text
     document.getElementById('ram').placeholder = 'e.g., 16GB, 32GB, 64GB';
     document.getElementById('storage').placeholder = 'e.g., 512GB, 1TB';
+
+    initializeSearch();
 });
 
 // Initialize navigation
@@ -569,5 +584,134 @@ async function loadDashboardMetrics() {
     } catch (error) {
         console.error('Error loading dashboard data:', error);
         throw error;
+    }
+}
+
+// Initialize search functionality
+function initializeSearch() {
+    const searchButton = document.getElementById('searchButton');
+    const searchField = document.getElementById('searchField');
+    const searchValue = document.getElementById('searchValue');
+    const modal = document.getElementById('assetModal');
+    const closeModal = document.getElementsByClassName('close')[0];
+    
+    // Search button click handler
+    searchButton.addEventListener('click', performSearch);
+    
+    // Enter key handler for search input
+    searchValue.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            performSearch();
+        }
+    });
+    
+    // Modal close button
+    if (closeModal) {
+        closeModal.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+    }
+    
+    // Click outside modal to close
+    window.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+}
+
+// Perform search
+async function performSearch() {
+    const searchField = document.getElementById('searchField').value;
+    const searchValue = document.getElementById('searchValue').value.trim();
+    const resultsTable = document.getElementById('resultsTable');
+    const noResults = document.getElementById('noResults');
+    
+    if (!searchField || !searchValue) {
+        showNotification('Please select a search field and enter a search value', 'error');
+        return;
+    }
+    
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/search?field=${encodeURIComponent(searchField)}&value=${encodeURIComponent(searchValue)}`);
+        if (!response.ok) throw new Error('Search failed');
+        
+        const results = await response.json();
+        displaySearchResults(results);
+    } catch (error) {
+        console.error('Search error:', error);
+        showNotification('Error performing search. Please try again.', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Display search results
+function displaySearchResults(results) {
+    const resultsTable = document.getElementById('resultsTable');
+    const noResults = document.getElementById('noResults');
+    const searchResults = document.getElementById('searchResults');
+    
+    // Clear previous results
+    searchResults.innerHTML = '';
+    
+    if (results.length === 0) {
+        resultsTable.classList.add('hidden');
+        noResults.classList.remove('hidden');
+        return;
+    }
+    
+    // Show results table and hide no results message
+    resultsTable.classList.remove('hidden');
+    noResults.classList.add('hidden');
+    
+    // Populate results
+    results.forEach(asset => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${asset['Asset ID']}</td>
+            <td>${asset['Asset Type']}</td>
+            <td>${asset['Make']}</td>
+            <td>${asset['Model']}</td>
+            <td>${asset['Serial Number']}</td>
+            <td>${asset['Status']}</td>
+            <td>${asset['Location']}</td>
+            <td>${asset['Assignee']}</td>
+            <td><span class="view-details" onclick="showAssetDetails('${asset['Asset ID']}')">View Details</span></td>
+        `;
+        searchResults.appendChild(row);
+    });
+}
+
+// Show asset details in modal
+async function showAssetDetails(assetId) {
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/assets/${encodeURIComponent(assetId)}`);
+        if (!response.ok) throw new Error('Failed to fetch asset details');
+        
+        const asset = await response.json();
+        const assetDetails = document.getElementById('assetDetails');
+        
+        // Create details HTML
+        const detailsHTML = Object.entries(asset)
+            .map(([key, value]) => `
+                <div class="detail-item">
+                    <div class="detail-label">${key}</div>
+                    <div class="detail-value">${value || '-'}</div>
+                </div>
+            `)
+            .join('');
+        
+        assetDetails.innerHTML = detailsHTML;
+        document.getElementById('assetModal').style.display = 'block';
+    } catch (error) {
+        console.error('Error fetching asset details:', error);
+        showNotification('Error fetching asset details. Please try again.', 'error');
+    } finally {
+        hideLoading();
     }
 } 
