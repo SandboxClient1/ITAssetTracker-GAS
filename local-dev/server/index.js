@@ -1,9 +1,9 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const XLSX = require('xlsx');
 const path = require('path');
-const fs = require('fs');
+const { Asset } = require('./models');
+const sequelize = require('./config/database');
 
 const app = express();
 const PORT = 3000;
@@ -56,128 +56,71 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Initialize Excel workbook for assets
-const ASSETS_FILE = path.join(__dirname, 'assets.xlsx');
-if (!fs.existsSync(ASSETS_FILE)) {
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([
-        ['Registration Date', 'Asset ID', 'Asset Type', 'Make', 'Model', 'Serial Number', 
-         'Operating System', 'Processor', 'RAM', 'Storage', 'Location', 'Status', 'Assignee', 
-         'Condition', 'Notes']
-    ]);
-    XLSX.utils.book_append_sheet(wb, ws, 'Assets');
-    XLSX.writeFile(wb, ASSETS_FILE);
-}
-
-// Helper functions
-function readAssetsSheet() {
-    const workbook = XLSX.readFile(ASSETS_FILE);
-    const sheet = workbook.Sheets['Assets'];
-    return XLSX.utils.sheet_to_json(sheet);
-}
-
-function writeAssetsSheet(data) {
-    const workbook = XLSX.readFile(ASSETS_FILE);
-    const ws = XLSX.utils.json_to_sheet(data);
-    workbook.Sheets['Assets'] = ws;
-    XLSX.writeFile(workbook, ASSETS_FILE);
-}
-
-// Routes
-app.get('/api/assets', (req, res) => {
+// Updated Routes
+app.get('/api/assets', async (req, res) => {
     try {
-        const assets = readAssetsSheet();
+        const assets = await Asset.findAll({
+            order: [['registrationDate', 'DESC']]
+        });
+        logger(LOG_LEVELS.DEBUG, `Retrieved ${assets.length} assets`);
         res.json(assets);
     } catch (error) {
+        logger(LOG_LEVELS.ERROR, 'Failed to fetch assets', error);
         res.status(500).json({ error: 'Failed to fetch assets' });
     }
 });
 
-app.post('/api/assets', (req, res) => {
+app.post('/api/assets', async (req, res) => {
     try {
-        const assets = readAssetsSheet();
-        const newAssetID = generateAssetID(assets);
-        const newAsset = {
-            'Registration Date': new Date().toISOString(),
-            'Asset ID': newAssetID,
-            ...req.body
-        };
+        // Generate new asset ID (you can keep your existing generation logic)
+        const latestAsset = await Asset.findOne({
+            order: [['assetId', 'DESC']]
+        });
         
-        assets.push(newAsset);
-        writeAssetsSheet(assets);
-        
+        let newAssetID;
+        if (latestAsset) {
+            const lastNumber = parseInt(latestAsset.assetId.replace('AST', ''));
+            newAssetID = `AST${String(lastNumber + 1).padStart(3, '0')}`;
+        } else {
+            newAssetID = 'AST001';
+        }
+
+        const newAsset = await Asset.create({
+            registrationDate: new Date(),
+            assetId: newAssetID,
+            assetType: req.body.assetType,
+            make: req.body.make,
+            model: req.body.model,
+            serialNumber: req.body.serialNumber,
+            operatingSystem: req.body.operatingSystem,
+            processor: req.body.processor,
+            ram: req.body.ram,
+            storage: req.body.storage,
+            location: req.body.location,
+            status: req.body.status,
+            assignee: req.body.assignee,
+            condition: req.body.condition,
+            notes: req.body.notes
+        });
+
+        logger(LOG_LEVELS.INFO, `New asset created`, { assetId: newAssetID });
         res.json({ success: true, assetID: newAssetID });
     } catch (error) {
+        logger(LOG_LEVELS.ERROR, 'Failed to register asset', error);
         res.status(500).json({ error: 'Failed to register asset' });
     }
 });
 
-app.get('/api/dashboard', (req, res) => {
-    try {
-        const assets = readAssetsSheet();
-        const metrics = calculateDashboardMetrics(assets);
-        res.json(metrics);
-    } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
-    }
-});
-
-app.get('/api/dropdowns', (req, res) => {
-    res.json({
-        assetTypes: ['Laptop', 'Desktop', 'Mobile', 'Tablet', 'Monitor', 'Printer', 'Server', 'Network Device', 'Other'],
-        operatingSystems: ['Windows 11', 'Windows 10', 'Windows 8', 'Windows 7', 'macOS', 'Linux', 'iOS', 'Android', 'Chrome OS', 'Other'],
-        locations: ['Office', 'Remote', 'Storage Room', 'Workshop', 'Data Center', 'Branch Office', 'Other'],
-        statuses: ['Assigned', 'In-Repair', 'In-Storage', 'Retired', 'On Order', 'Available', 'Lost', 'Other'],
-        conditions: ['New', 'Excellent', 'Good', 'Fair', 'Poor', 'Damaged', 'Not Working']
-    });
-});
-
-// Search endpoint
-app.get('/api/search', (req, res) => {
-    try {
-        const { field, value } = req.query;
-        
-        if (!field || !value) {
-            return res.status(400).json({ error: 'Search field and value are required' });
-        }
-        
-        const assets = readAssetsSheet();
-        
-        const results = assets.filter(asset => {
-            const assetValue = asset[field];
-            if (assetValue === undefined || assetValue === null) return false;
-            
-            const searchValue = value.toString().toLowerCase().trim();
-            const fieldValue = assetValue.toString().toLowerCase().trim();
-            
-            return fieldValue.includes(searchValue);
-        });
-        
-        logger(LOG_LEVELS.DEBUG, `Search performed`, {
-            field,
-            value,
-            resultCount: results.length
-        });
-
-        res.json(results);
-    } catch (error) {
-        logger(LOG_LEVELS.ERROR, 'Search failed', error);
-        res.status(500).json({ error: 'Search failed' });
-    }
-});
-
-// Get asset details endpoint
-app.get('/api/assets/:id', (req, res) => {
+app.get('/api/assets/:id', async (req, res) => {
     try {
         const assetId = req.params.id;
-        const assets = readAssetsSheet();
-        
-        const asset = assets.find(a => a['Asset ID'] === assetId);
+        const asset = await Asset.findOne({
+            where: { assetId: assetId }
+        });
         
         if (!asset) {
             logger(LOG_LEVELS.WARN, `Asset not found`, { assetId });
-            res.status(404).json({ error: 'Asset not found' });
-            return;
+            return res.status(404).json({ error: 'Asset not found' });
         }
         
         logger(LOG_LEVELS.DEBUG, `Asset details retrieved`, { assetId });
@@ -188,58 +131,213 @@ app.get('/api/assets/:id', (req, res) => {
     }
 });
 
-// Get distinct values for filters
-app.get('/api/distinct-values', (req, res) => {
+app.get('/api/search', async (req, res) => {
+    try {
+        const { field, value } = req.query;
+        
+        if (!field || !value) {
+            return res.status(400).json({ error: 'Search field and value are required' });
+        }
+
+        // Map frontend field names to database column names
+        const fieldMapping = {
+            'Asset Type': 'assetType',
+            'Asset ID': 'assetId',
+            'Serial Number': 'serialNumber',
+            'Operating System': 'operatingSystem',
+            'Location': 'location',
+            'Status': 'status',
+            'Assignee': 'assignee',
+            'Condition': 'condition',
+            'Make': 'make',
+            'Model': 'model'
+        };
+
+        const dbField = fieldMapping[field] || field.toLowerCase();
+
+        const results = await Asset.findAll({
+            where: sequelize.where(
+                sequelize.fn('LOWER', sequelize.col(dbField)),
+                'LIKE',
+                `%${value.toLowerCase()}%`
+            )
+        });
+
+        res.json(results);
+    } catch (error) {
+        logger(LOG_LEVELS.ERROR, 'Search failed', error);
+        res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+app.get('/api/distinct-values', async (req, res) => {
     try {
         const { field } = req.query;
-        const assets = readAssetsSheet();
-        
-        const values = [...new Set(assets.map(asset => asset[field]))].filter(Boolean);
-        res.json(values.sort());
+
+        // Map frontend field names to database column names
+        const fieldMapping = {
+            'Asset Type': 'assetType',
+            'Asset ID': 'assetId',
+            'Serial Number': 'serialNumber',
+            'Operating System': 'operatingSystem',
+            'Location': 'location',
+            'Status': 'status',
+            'Assignee': 'assignee',
+            'Condition': 'condition',
+            'Make': 'make',
+            'Model': 'model'
+        };
+
+        const dbField = fieldMapping[field] || field.toLowerCase();
+
+        const values = await Asset.findAll({
+            attributes: [[sequelize.fn('DISTINCT', sequelize.col(dbField)), dbField]],
+            where: {
+                [dbField]: {
+                    [sequelize.Op.not]: null
+                }
+            },
+            order: [[dbField, 'ASC']]
+        });
+
+        res.json(values.map(item => item[dbField]));
     } catch (error) {
         logger(LOG_LEVELS.ERROR, 'Failed to get distinct values', error);
         res.status(500).json({ error: 'Failed to get values' });
     }
 });
 
-// Export endpoint
-app.get('/api/export', (req, res) => {
+app.get('/api/dashboard', async (req, res) => {
+    try {
+        const assets = await Asset.findAll();
+        
+        const statusCounts = {
+            Available: 0,
+            Assigned: 0,
+            'In-Repair': 0
+        };
+
+        assets.forEach(asset => {
+            if (asset.status in statusCounts) {
+                statusCounts[asset.status]++;
+            }
+        });
+
+        const response = {
+            statusCounts,
+            totalAssets: assets.length,
+            Available: statusCounts.Available,
+            Assigned: statusCounts.Assigned,
+            'In-Repair': statusCounts['In-Repair'],
+            byType: {},
+            byStatus: {},
+            byOS: {},
+            byLocation: {}
+        };
+
+        // Calculate distributions
+        assets.forEach(asset => {
+            // By Type
+            if (asset.assetType) {
+                response.byType[asset.assetType] = (response.byType[asset.assetType] || 0) + 1;
+            }
+            
+            // By Status
+            if (asset.status) {
+                response.byStatus[asset.status] = (response.byStatus[asset.status] || 0) + 1;
+            }
+            
+            // By OS
+            if (asset.operatingSystem) {
+                response.byOS[asset.operatingSystem] = (response.byOS[asset.operatingSystem] || 0) + 1;
+            }
+            
+            // By Location
+            if (asset.location) {
+                response.byLocation[asset.location] = (response.byLocation[asset.location] || 0) + 1;
+            }
+        });
+
+        // Add recent activity
+        response.recentActivity = assets
+            .sort((a, b) => new Date(b.registrationDate) - new Date(a.registrationDate))
+            .slice(0, 5);
+
+        res.json(response);
+    } catch (error) {
+        logger(LOG_LEVELS.ERROR, 'Failed to fetch dashboard metrics', error);
+        res.status(500).json({ error: 'Failed to fetch dashboard metrics' });
+    }
+});
+
+app.get('/api/export', async (req, res) => {
     try {
         const { field, value } = req.query;
-        let assets = readAssetsSheet();
+        
+        // Map frontend field names to database column names
+        const fieldMapping = {
+            'Asset Type': 'assetType',
+            'Asset ID': 'assetId',
+            'Location': 'location',
+            'Status': 'status'
+        };
 
-        // Apply filter if provided
+        let whereClause = {};
         if (field && value) {
-            assets = assets.filter(asset => asset[field] === value);
+            const dbField = fieldMapping[field] || field.toLowerCase();
+            whereClause[dbField] = value;
         }
+
+        const assets = await Asset.findAll({
+            where: whereClause,
+            order: [['registrationDate', 'DESC']]
+        });
 
         // Convert to CSV
         const csvRows = [];
         
-        // Add headers
-        if (assets.length > 0) {
-            csvRows.push(Object.keys(assets[0]).join(','));
-        }
+        // Define headers
+        const headers = [
+            'Registration Date', 'Asset ID', 'Asset Type', 'Make', 'Model',
+            'Serial Number', 'Operating System', 'Processor', 'RAM', 'Storage',
+            'Location', 'Status', 'Assignee', 'Condition', 'Notes'
+        ];
+        
+        csvRows.push(headers.join(','));
 
         // Add data rows
         assets.forEach(asset => {
-            const values = Object.values(asset).map(val => {
-                // Handle values that need escaping
-                if (typeof val === 'string' && (val.includes(',') || val.includes('"') || val.includes('\n'))) {
-                    return `"${val.replace(/"/g, '""')}"`;
+            const row = [
+                asset.registrationDate,
+                asset.assetId,
+                asset.assetType,
+                asset.make,
+                asset.model,
+                asset.serialNumber,
+                asset.operatingSystem,
+                asset.processor,
+                asset.ram,
+                asset.storage,
+                asset.location,
+                asset.status,
+                asset.assignee,
+                asset.condition,
+                asset.notes
+            ].map(value => {
+                if (value === null || value === undefined) return '';
+                if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                    return `"${value.replace(/"/g, '""')}"`;
                 }
-                return val;
+                return value;
             });
-            csvRows.push(values.join(','));
+            
+            csvRows.push(row.join(','));
         });
 
         const csvData = csvRows.join('\n');
 
-        // Set response headers
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename=asset-export-${new Date().toISOString().split('T')[0]}.csv`);
-        
-        // Send CSV data
         res.send(csvData);
     } catch (error) {
         logger(LOG_LEVELS.ERROR, 'Export failed', error);
@@ -247,47 +345,18 @@ app.get('/api/export', (req, res) => {
     }
 });
 
-// Helper functions
-function generateAssetID(assets) {
-    if (assets.length === 0) {
-        return 'AST001';
-    }
-    const lastAsset = assets[assets.length - 1];
-    const lastID = lastAsset['Asset ID'];
-    const numericPart = parseInt(lastID.substring(3));
-    return `AST${String(numericPart + 1).padStart(3, '0')}`;
-}
-
-function calculateDashboardMetrics(assets) {
-    const metrics = {
-        totalAssets: assets.length,
-        assetsByType: {},
-        assetsByStatus: {},
-        assetsByOS: {},
-        assetsByLocation: {}
-    };
-    
-    assets.forEach(asset => {
-        // Count by type
-        const type = asset['Asset Type'];
-        metrics.assetsByType[type] = (metrics.assetsByType[type] || 0) + 1;
-        
-        // Count by status
-        const status = asset['Status'];
-        metrics.assetsByStatus[status] = (metrics.assetsByStatus[status] || 0) + 1;
-        
-        // Count by OS
-        const os = asset['Operating System'];
-        metrics.assetsByOS[os] = (metrics.assetsByOS[os] || 0) + 1;
-        
-        // Count by location
-        const location = asset['Location'];
-        metrics.assetsByLocation[location] = (metrics.assetsByLocation[location] || 0) + 1;
+// Keep the dropdowns endpoint as is since it's static data
+app.get('/api/dropdowns', (req, res) => {
+    res.json({
+        assetTypes: ['Laptop', 'Desktop', 'Mobile', 'Tablet', 'Monitor', 'Printer', 'Server', 'Network Device', 'Other'],
+        operatingSystems: ['Windows 11', 'Windows 10', 'Windows 8', 'Windows 7', 'macOS', 'Linux', 'iOS', 'Android', 'Chrome OS', 'Other'],
+        locations: ['Office', 'Remote', 'Storage Room', 'Workshop', 'Data Center', 'Branch Office', 'Other'],
+        statuses: ['Assigned', 'In-Repair', 'In-Storage', 'Retired', 'On Order', 'Available', 'Lost', 'Other'],
+        conditions: ['New', 'Excellent', 'Good', 'Fair', 'Poor', 'Damaged', 'Not Working']
     });
-    
-    return metrics;
-}
+});
 
+// Start the server
 app.listen(PORT, () => {
-    logger(LOG_LEVELS.INFO, `Server running at http://localhost:${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 }); 
