@@ -1,30 +1,36 @@
 const { Sequelize } = require('sequelize');
-require('dotenv').config();
-
-const sequelize = new Sequelize({
-    dialect: 'postgres',
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    database: process.env.DB_NAME,
-    username: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    logging: false,
-    define: {
-        timestamps: true,
-        underscored: true
-    }
+require('dotenv').config({
+  path: process.env.NODE_ENV === 'test' ? '.env.test' : '.env'
 });
 
-// Test the connection
-async function testConnection() {
-    try {
-        await sequelize.authenticate();
-        console.log('Database connection established successfully.');
-    } catch (error) {
-        console.error('Unable to connect to the database:', error);
+const sequelize = new Sequelize(
+  process.env.DB_NAME,
+  process.env.DB_USER,
+  process.env.DB_PASSWORD,
+  {
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    dialect: 'postgres',
+    logging: process.env.NODE_ENV === 'test' ? false : console.log,
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
     }
-}
+  }
+);
 
-testConnection();
+// Only test connection if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  sequelize
+    .authenticate()
+    .then(() => {
+      console.log('Database connection established successfully.');
+    })
+    .catch((err) => {
+      console.error('Unable to connect to the database:', err);
+    });
+}
 
 module.exports = sequelize;

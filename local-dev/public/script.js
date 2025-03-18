@@ -174,18 +174,16 @@ async function loadDashboardData() {
         const response = await fetch(`${API_BASE_URL}/dashboard`);
         if (!response.ok) throw new Error('Failed to fetch dashboard data');
         
-        const metrics = await response.json();
+        const { data: metrics } = await response.json();
+        console.log('Received dashboard metrics:', metrics); // Debug log
         
         // Update total assets
         document.getElementById('totalAssets').textContent = metrics.totalAssets;
         
-        // Update summary cards
-        document.getElementById('availableAssets').textContent = 
-            metrics.assetsByStatus['Available'] || 0;
-        document.getElementById('assignedAssets').textContent = 
-            metrics.assetsByStatus['Assigned'] || 0;
-        document.getElementById('maintenanceAssets').textContent = 
-            (metrics.assetsByStatus['In-Repair'] || 0);
+        // Update status counts
+        document.getElementById('availableAssets').textContent = metrics.statusCounts['Available'] || 0;
+        document.getElementById('assignedAssets').textContent = metrics.statusCounts['Assigned'] || 0;
+        document.getElementById('maintenanceAssets').textContent = metrics.statusCounts['In-Repair'] || 0;
         
         // Create or update charts
         createOrUpdateChart('assetsByTypeChart', 'doughnut', 'Assets by Type', metrics.assetsByType);
@@ -329,14 +327,8 @@ function validateFormData(formData) {
     
     // Required fields validation
     const requiredFields = [
-        { field: 'Asset Type', label: 'Asset Type' },
-        { field: 'Make', label: 'Make' },
-        { field: 'Model', label: 'Model' },
-        { field: 'Serial Number', label: 'Serial Number' },
-        { field: 'Operating System', label: 'Operating System' },
-        { field: 'Location', label: 'Location' },
-        { field: 'Status', label: 'Status' },
-        { field: 'Assignee', label: 'Assignee' }
+        { field: 'asset_type', label: 'Asset Type' },
+        { field: 'status', label: 'Status' }
     ];
 
     requiredFields.forEach(({ field, label }) => {
@@ -346,25 +338,21 @@ function validateFormData(formData) {
     });
 
     // Format validations
-    if (formData['Serial Number'] && !VALIDATION_RULES.serialNumber.pattern.test(formData['Serial Number'])) {
+    if (formData.serial_number && !VALIDATION_RULES.serialNumber.pattern.test(formData.serial_number)) {
         errors.push(VALIDATION_RULES.serialNumber.message);
     }
 
-    if (formData['Assignee'] && !VALIDATION_RULES.email.pattern.test(formData['Assignee'])) {
-        errors.push(VALIDATION_RULES.email.message);
-    }
-
-    if (formData['RAM'] && !VALIDATION_RULES.ram.pattern.test(formData['RAM'])) {
+    if (formData.ram && !VALIDATION_RULES.ram.pattern.test(formData.ram)) {
         errors.push(VALIDATION_RULES.ram.message);
     }
 
-    if (formData['Storage'] && !VALIDATION_RULES.storage.pattern.test(formData['Storage'])) {
+    if (formData.storage && !VALIDATION_RULES.storage.pattern.test(formData.storage)) {
         errors.push(VALIDATION_RULES.storage.message);
     }
 
     // Length validations
     Object.entries(VALIDATION_RULES.maxLengths).forEach(([field, maxLength]) => {
-        const value = formData[field.charAt(0).toUpperCase() + field.slice(1)];
+        const value = formData[field];
         if (value && value.length > maxLength) {
             errors.push(`${field} must not exceed ${maxLength} characters`);
         }
@@ -379,19 +367,19 @@ async function handleFormSubmit(e) {
     
     // Get form data
     const formData = {
-        'Asset Type': document.getElementById('assetType').value,
-        'Make': document.getElementById('make').value,
-        'Model': document.getElementById('model').value,
-        'Serial Number': document.getElementById('serialNumber').value,
-        'Operating System': document.getElementById('operatingSystem').value,
-        'Processor': document.getElementById('processor').value,
-        'RAM': document.getElementById('ram').value,
-        'Storage': document.getElementById('storage').value,
-        'Location': document.getElementById('location').value,
-        'Status': document.getElementById('status').value,
-        'Assignee': document.getElementById('assignee').value,
-        'Condition': document.getElementById('condition').value,
-        'Notes': document.getElementById('notes').value
+        asset_type: document.getElementById('assetType').value,
+        make: document.getElementById('make').value,
+        model: document.getElementById('model').value,
+        serial_number: document.getElementById('serialNumber').value,
+        operating_system: document.getElementById('operatingSystem').value,
+        processor: document.getElementById('processor').value,
+        ram: document.getElementById('ram').value,
+        storage: document.getElementById('storage').value,
+        location: document.getElementById('location').value,
+        status: document.getElementById('status').value,
+        assignee: document.getElementById('assignee').value,
+        condition: document.getElementById('condition').value,
+        notes: document.getElementById('notes').value
     };
 
     // Validate form data
@@ -414,7 +402,10 @@ async function handleFormSubmit(e) {
             body: JSON.stringify(formData)
         });
         
-        if (!response.ok) throw new Error('Failed to register asset');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to register asset');
+        }
         
         const result = await response.json();
         
@@ -432,7 +423,7 @@ async function handleFormSubmit(e) {
     } catch (error) {
         console.error('Error registering asset:', error);
         hideLoading();
-        showNotification('Error registering asset. Please try again.', 'error');
+        showNotification('Error registering asset: ' + error.message, 'error');
     }
 }
 
@@ -658,7 +649,7 @@ function displaySearchResults(results) {
     // Clear previous results
     searchResults.innerHTML = '';
     
-    if (results.length === 0) {
+    if (!results.data || results.data.length === 0) {
         resultsTable.classList.add('hidden');
         noResults.classList.remove('hidden');
         return;
@@ -669,19 +660,34 @@ function displaySearchResults(results) {
     noResults.classList.add('hidden');
     
     // Populate results
-    results.forEach(asset => {
+    results.data.forEach(asset => {
         const row = document.createElement('tr');
         row.innerHTML = `
-            <td>${asset['Asset ID']}</td>
-            <td>${asset['Asset Type']}</td>
-            <td>${asset['Make']}</td>
-            <td>${asset['Model']}</td>
-            <td>${asset['Serial Number']}</td>
-            <td>${asset['Status']}</td>
-            <td>${asset['Location']}</td>
-            <td>${asset['Assignee']}</td>
-            <td><span class="view-details" onclick="showAssetDetails('${asset['Asset ID']}')">View Details</span></td>
+            <td>${asset.asset_id || '-'}</td>
+            <td>${asset.asset_type || '-'}</td>
+            <td>${asset.make || '-'}</td>
+            <td>${asset.model || '-'}</td>
+            <td>${asset.serial_number || '-'}</td>
+            <td>${asset.status || '-'}</td>
+            <td>${asset.location || '-'}</td>
+            <td>${asset.assignee || '-'}</td>
+            <td class="action-buttons">
+                <button class="view-details-btn btn btn-info btn-sm">View</button>
+                <button class="edit-asset-btn btn btn-warning btn-sm">Edit</button>
+                <button class="delete-asset-btn btn btn-danger btn-sm">Delete</button>
+            </td>
         `;
+        
+        // Add event listeners to the buttons
+        const viewDetailsBtn = row.querySelector('.view-details-btn');
+        viewDetailsBtn.addEventListener('click', () => showAssetDetails(asset.asset_id));
+        
+        const editAssetBtn = row.querySelector('.edit-asset-btn');
+        editAssetBtn.addEventListener('click', () => showEditAssetForm(asset.asset_id));
+        
+        const deleteAssetBtn = row.querySelector('.delete-asset-btn');
+        deleteAssetBtn.addEventListener('click', () => confirmDeleteAsset(asset.asset_id));
+        
         searchResults.appendChild(row);
     });
 }
@@ -692,26 +698,70 @@ async function showAssetDetails(assetId) {
     
     try {
         const response = await fetch(`${API_BASE_URL}/assets/${encodeURIComponent(assetId)}`);
-        if (!response.ok) throw new Error('Failed to fetch asset details');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to fetch asset details');
+        }
         
-        const asset = await response.json();
+        const { data: asset } = await response.json();
+        if (!asset) {
+            throw new Error('No asset data received');
+        }
+
         const assetDetails = document.getElementById('assetDetails');
         
+        // Format the details in a more readable way
+        const formattedDetails = {
+            'Asset ID': asset.asset_id,
+            'Asset Type': asset.asset_type,
+            'Make': asset.make,
+            'Model': asset.model,
+            'Serial Number': asset.serial_number,
+            'Operating System': asset.operating_system,
+            'Processor': asset.processor,
+            'RAM': asset.ram,
+            'Storage': asset.storage,
+            'Location': asset.location,
+            'Status': asset.status,
+            'Assignee': asset.assignee,
+            'Condition': asset.condition,
+            'Registration Date': asset.registration_date ? new Date(asset.registration_date).toLocaleDateString() : '-',
+            'Notes': asset.notes
+        };
+        
         // Create details HTML
-        const detailsHTML = Object.entries(asset)
+        const detailsHTML = Object.entries(formattedDetails)
             .map(([key, value]) => `
                 <div class="detail-item">
-                    <div class="detail-label">${key}</div>
+                    <div class="detail-label">${key}:</div>
                     <div class="detail-value">${value || '-'}</div>
                 </div>
             `)
             .join('');
         
         assetDetails.innerHTML = detailsHTML;
-        document.getElementById('assetModal').style.display = 'block';
+        
+        // Show the modal
+        const modal = document.getElementById('assetModal');
+        modal.style.display = 'block';
+        
+        // Add close button functionality if not already added
+        const closeBtn = modal.querySelector('.close');
+        if (closeBtn) {
+            closeBtn.onclick = function() {
+                modal.style.display = 'none';
+            };
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        };
     } catch (error) {
         console.error('Error fetching asset details:', error);
-        showNotification('Error fetching asset details. Please try again.', 'error');
+        showNotification('Error fetching asset details: ' + error.message, 'error');
     } finally {
         hideLoading();
     }
@@ -727,6 +777,17 @@ function initializeExport() {
     const downloadButton = document.getElementById('downloadCSV');
     const exportTypeRadios = document.getElementsByName('exportType');
 
+    // Set up the initial filter field options
+    filterField.innerHTML = `
+        <option value="">Select a field</option>
+        <option value="Status">Status</option>
+        <option value="Location">Location</option>
+        <option value="Asset Type">Asset Type</option>
+    `;
+
+    // Initialize the filter value dropdown
+    filterValue.innerHTML = '<option value="">Select a value</option>';
+
     // Toggle export options
     exportButton.addEventListener('click', () => {
         exportOptions.classList.toggle('hidden');
@@ -738,7 +799,9 @@ function initializeExport() {
             const filterOptions = document.querySelector('.filter-options');
             if (e.target.value === 'filtered') {
                 filterOptions.classList.remove('hidden');
-                updateFilterValues();
+                if (filterField.value) {
+                    updateFilterValues();
+                }
             } else {
                 filterOptions.classList.add('hidden');
             }
@@ -746,29 +809,15 @@ function initializeExport() {
     });
 
     // Update filter values when field changes
-    filterField.addEventListener('change', updateFilterValues);
+    filterField.addEventListener('change', () => {
+        filterValue.innerHTML = '<option value="">Select a value</option>';
+        if (filterField.value) {
+            updateFilterValues();
+        }
+    });
 
     // Handle download
     downloadButton.addEventListener('click', handleExport);
-}
-
-async function updateFilterValues() {
-    const filterField = document.getElementById('filterField');
-    const filterValue = document.getElementById('filterValue');
-    const field = filterField.value;
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/distinct-values?field=${field}`);
-        if (!response.ok) throw new Error('Failed to fetch values');
-
-        const values = await response.json();
-        filterValue.innerHTML = values
-            .map(value => `<option value="${value}">${value}</option>`)
-            .join('');
-    } catch (error) {
-        console.error('Error fetching filter values:', error);
-        showNotification('Error loading filter values', 'error');
-    }
 }
 
 async function handleExport() {
@@ -781,16 +830,31 @@ async function handleExport() {
         if (exportType === 'filtered') {
             const field = document.getElementById('filterField').value;
             const value = document.getElementById('filterValue').value;
+            if (!field || !value) {
+                throw new Error('Please select both filter field and value');
+            }
             url += `?field=${encodeURIComponent(field)}&value=${encodeURIComponent(value)}`;
         }
 
         const response = await fetch(url);
-        if (!response.ok) throw new Error('Export failed');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || `Export failed: ${response.statusText}`);
+        }
+
+        // Get the filename from the Content-Disposition header if available
+        let filename = 'asset-export.csv';
+        const contentDisposition = response.headers.get('Content-Disposition');
+        if (contentDisposition) {
+            const match = contentDisposition.match(/filename=(.+)/);
+            if (match) {
+                filename = match[1];
+            }
+        }
 
         // Create blob from response
         const blob = await response.blob();
         const downloadUrl = window.URL.createObjectURL(blob);
-        const filename = `asset-export-${new Date().toISOString().split('T')[0]}.csv`;
 
         // Create temporary link and trigger download
         const link = document.createElement('a');
@@ -804,7 +868,247 @@ async function handleExport() {
         showNotification('Export completed successfully');
     } catch (error) {
         console.error('Export error:', error);
-        showNotification('Error exporting data. Please try again.', 'error');
+        showNotification(error.message || 'Error exporting data. Please try again.', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function updateFilterValues() {
+    const filterField = document.getElementById('filterField');
+    const filterValue = document.getElementById('filterValue');
+    const field = filterField.value;
+
+    console.log('Updating filter values for field:', field);
+
+    if (!field) {
+        filterValue.innerHTML = '<option value="">Select a value</option>';
+        return;
+    }
+
+    try {
+        showLoading();
+        console.log('Fetching distinct values for:', field);
+        const response = await fetch(`${API_BASE_URL}/distinct-values?field=${encodeURIComponent(field)}`);
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('Server response error:', errorData);
+            throw new Error(errorData.message || `Failed to fetch values (${response.status})`);
+        }
+
+        const values = await response.json();
+        console.log('Received values:', values);
+        
+        // Clear existing options
+        filterValue.innerHTML = '<option value="">Select a value</option>';
+        
+        // Add new options
+        if (Array.isArray(values) && values.length > 0) {
+            values.forEach(value => {
+                if (value !== null && value !== undefined && value !== '') {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    filterValue.appendChild(option);
+                }
+            });
+            console.log('Added', filterValue.options.length - 1, 'options to dropdown');
+        } else {
+            console.log('No values received from server');
+            filterValue.innerHTML = '<option value="">No values available</option>';
+        }
+    } catch (error) {
+        console.error('Error in updateFilterValues:', error);
+        showNotification('Error loading filter values: ' + error.message, 'error');
+        filterValue.innerHTML = '<option value="">Error loading values</option>';
+    } finally {
+        hideLoading();
+    }
+}
+
+// Global variable to store the ID of the asset being deleted
+let assetToDelete = null;
+
+// Show edit asset form
+async function showEditAssetForm(assetId) {
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/assets/${encodeURIComponent(assetId)}`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to fetch asset details');
+        }
+        
+        const { data: asset } = await response.json();
+        if (!asset) {
+            throw new Error('No asset data received');
+        }
+
+        // Populate the edit form with asset data
+        document.getElementById('editAssetID').value = asset.asset_id;
+        document.getElementById('editAssetType').value = asset.asset_type;
+        document.getElementById('editMake').value = asset.make || '';
+        document.getElementById('editModel').value = asset.model || '';
+        document.getElementById('editSerialNumber').value = asset.serial_number || '';
+        document.getElementById('editOperatingSystem').value = asset.operating_system || '';
+        document.getElementById('editProcessor').value = asset.processor || '';
+        document.getElementById('editRAM').value = asset.ram || '';
+        document.getElementById('editStorage').value = asset.storage || '';
+        document.getElementById('editLocation').value = asset.location || '';
+        document.getElementById('editStatus').value = asset.status;
+        document.getElementById('editAssignee').value = asset.assignee || '';
+        document.getElementById('editCondition').value = asset.condition || '';
+        document.getElementById('editNotes').value = asset.notes || '';
+
+        // Show the edit modal
+        const modal = document.getElementById('editAssetModal');
+        modal.style.display = 'block';
+
+        // Add form submit handler
+        const form = document.getElementById('editAssetForm');
+        form.onsubmit = (e) => handleEditFormSubmit(e, asset.id);
+
+        // Add close button functionality
+        const closeBtn = modal.querySelector('.close');
+        if (closeBtn) {
+            closeBtn.onclick = closeEditModal;
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target === modal) {
+                closeEditModal();
+            }
+        };
+    } catch (error) {
+        console.error('Error loading asset for editing:', error);
+        showNotification('Error loading asset details: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Handle edit form submission
+async function handleEditFormSubmit(e, assetId) {
+    e.preventDefault();
+    
+    // Get form data
+    const formData = {
+        asset_type: document.getElementById('editAssetType').value,
+        make: document.getElementById('editMake').value,
+        model: document.getElementById('editModel').value,
+        serial_number: document.getElementById('editSerialNumber').value,
+        operating_system: document.getElementById('editOperatingSystem').value,
+        processor: document.getElementById('editProcessor').value,
+        ram: document.getElementById('editRAM').value,
+        storage: document.getElementById('editStorage').value,
+        location: document.getElementById('editLocation').value,
+        status: document.getElementById('editStatus').value,
+        assignee: document.getElementById('editAssignee').value,
+        condition: document.getElementById('editCondition').value,
+        notes: document.getElementById('editNotes').value
+    };
+
+    // Validate form data
+    const validationErrors = validateFormData(formData);
+    if (validationErrors.length > 0) {
+        showNotification(validationErrors.join('\n'), 'error');
+        return;
+    }
+
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/assets/${assetId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to update asset');
+        }
+
+        const result = await response.json();
+        
+        // Close the modal
+        closeEditModal();
+        
+        // Show success message
+        showNotification('Asset updated successfully');
+        
+        // Refresh the search results
+        performSearch();
+        
+        // Refresh dashboard data
+        loadDashboardData();
+    } catch (error) {
+        console.error('Error updating asset:', error);
+        showNotification('Error updating asset: ' + error.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Close edit modal
+function closeEditModal() {
+    const modal = document.getElementById('editAssetModal');
+    modal.style.display = 'none';
+    document.getElementById('editAssetForm').reset();
+}
+
+// Show delete confirmation
+function confirmDeleteAsset(assetId) {
+    assetToDelete = assetId;
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.style.display = 'block';
+}
+
+// Close delete modal
+function closeDeleteModal() {
+    const modal = document.getElementById('deleteConfirmModal');
+    modal.style.display = 'none';
+    assetToDelete = null;
+}
+
+// Delete asset
+async function deleteAsset() {
+    if (!assetToDelete) {
+        showNotification('No asset selected for deletion', 'error');
+        return;
+    }
+
+    showLoading();
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/assets/${assetToDelete}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to delete asset');
+        }
+
+        // Close the modal
+        closeDeleteModal();
+        
+        // Show success message
+        showNotification('Asset deleted successfully');
+        
+        // Refresh the search results
+        performSearch();
+        
+        // Refresh dashboard data
+        loadDashboardData();
+    } catch (error) {
+        console.error('Error deleting asset:', error);
+        showNotification('Error deleting asset: ' + error.message, 'error');
     } finally {
         hideLoading();
     }

@@ -1,5 +1,6 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 const sequelize = require('../config/database');
+const { ASSET_STATUSES } = require('../constants');
 
 const Asset = sequelize.define('Asset', {
     id: {
@@ -7,22 +8,25 @@ const Asset = sequelize.define('Asset', {
         primaryKey: true,
         autoIncrement: true
     },
-    registrationDate: {
+    registration_date: {
         type: DataTypes.DATE,
-        allowNull: false,
         defaultValue: DataTypes.NOW,
-        field: 'registration_date'
+        allowNull: false
     },
-    assetId: {
+    asset_id: {
         type: DataTypes.STRING(50),
-        allowNull: false,
         unique: true,
-        field: 'asset_id'
+        allowNull: false,
+        validate: {
+            notEmpty: true
+        }
     },
-    assetType: {
+    asset_type: {
         type: DataTypes.STRING(50),
         allowNull: false,
-        field: 'asset_type'
+        validate: {
+            notEmpty: true
+        }
     },
     make: {
         type: DataTypes.STRING(100),
@@ -32,16 +36,14 @@ const Asset = sequelize.define('Asset', {
         type: DataTypes.STRING(100),
         allowNull: true
     },
-    serialNumber: {
+    serial_number: {
         type: DataTypes.STRING(100),
         unique: true,
-        allowNull: true,
-        field: 'serial_number'
+        allowNull: true
     },
-    operatingSystem: {
+    operating_system: {
         type: DataTypes.STRING(50),
-        allowNull: true,
-        field: 'operating_system'
+        allowNull: true
     },
     processor: {
         type: DataTypes.STRING(100),
@@ -61,7 +63,11 @@ const Asset = sequelize.define('Asset', {
     },
     status: {
         type: DataTypes.STRING(50),
-        allowNull: true
+        allowNull: false,
+        defaultValue: ASSET_STATUSES.AVAILABLE,
+        validate: {
+            isIn: [Object.values(ASSET_STATUSES)]
+        }
     },
     assignee: {
         type: DataTypes.STRING(100),
@@ -69,7 +75,10 @@ const Asset = sequelize.define('Asset', {
     },
     condition: {
         type: DataTypes.STRING(50),
-        allowNull: true
+        allowNull: true,
+        validate: {
+            isIn: [['New', 'Good', 'Fair', 'Poor']]
+        }
     },
     notes: {
         type: DataTypes.TEXT,
@@ -77,7 +86,51 @@ const Asset = sequelize.define('Asset', {
     }
 }, {
     tableName: 'assets',
-    timestamps: false // Since we're matching the existing schema
+    timestamps: true,
+    underscored: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    indexes: [
+        {
+            unique: true,
+            fields: ['asset_id']
+        },
+        {
+            unique: true,
+            fields: ['serial_number']
+        },
+        {
+            fields: ['status']
+        }
+    ]
 });
+
+Asset.prototype.toJSON = function() {
+    const values = { ...this.get() };
+    if (values.registration_date) {
+        values.registration_date = values.registration_date.toISOString();
+    }
+    return values;
+};
+
+Asset.generateAssetId = async function(assetType) {
+    const prefix = assetType.substring(0, 3).toUpperCase();
+    const lastAsset = await this.findOne({
+        where: {
+            asset_id: {
+                [Op.like]: `${prefix}%`
+            }
+        },
+        order: [['asset_id', 'DESC']]
+    });
+
+    if (!lastAsset) {
+        return `${prefix}001`;
+    }
+
+    const lastNumber = parseInt(lastAsset.asset_id.slice(3));
+    const newNumber = (lastNumber + 1).toString().padStart(3, '0');
+    return `${prefix}${newNumber}`;
+};
 
 module.exports = Asset;

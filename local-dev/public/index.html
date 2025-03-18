@@ -4,6 +4,7 @@
     <base target="_top">
     <title>IT Asset Tracker</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
   </head>
   <body>
     <div class="container">
@@ -41,7 +42,7 @@
               </div>
               
               <div class="metric-card maintenance-assets">
-                <h3>In Maintenance</h3>
+                <h3>In-Repair</h3>
                 <div class="metric-value" id="maintenanceAssets">Loading...</div>
               </div>
             </div>
@@ -125,23 +126,23 @@
               </div>
               
               <div class="form-group">
-                <label for="make">Make: <span class="required">*</span></label>
-                <input type="text" id="make" name="make" required>
+                <label for="make">Make:</label>
+                <input type="text" id="make" name="make">
               </div>
               
               <div class="form-group">
-                <label for="model">Model: <span class="required">*</span></label>
-                <input type="text" id="model" name="model" required>
+                <label for="model">Model:</label>
+                <input type="text" id="model" name="model">
               </div>
               
               <div class="form-group">
-                <label for="serialNumber">Serial Number: <span class="required">*</span></label>
-                <input type="text" id="serialNumber" name="serialNumber" required>
+                <label for="serialNumber">Serial Number:</label>
+                <input type="text" id="serialNumber" name="serialNumber">
               </div>
               
               <div class="form-group">
-                <label for="operatingSystem">Operating System: <span class="required">*</span></label>
-                <select id="operatingSystem" name="operatingSystem" required>
+                <label for="operatingSystem">Operating System:</label>
+                <select id="operatingSystem" name="operatingSystem">
                   <option value="">Select Operating System</option>
                 </select>
               </div>
@@ -165,8 +166,8 @@
               </div>
               
               <div class="form-group">
-                <label for="location">Location: <span class="required">*</span></label>
-                <select id="location" name="location" required>
+                <label for="location">Location:</label>
+                <select id="location" name="location">
                   <option value="">Select Location</option>
                 </select>
               </div>
@@ -179,8 +180,8 @@
               </div>
               
               <div class="form-group">
-                <label for="assignee">Assignee: <span class="required">*</span></label>
-                <input type="email" id="assignee" name="assignee" required placeholder="email@example.com">
+                <label for="assignee">Assignee:</label>
+                <input type="email" id="assignee" name="assignee" placeholder="email@example.com">
               </div>
               
               <div class="form-group">
@@ -259,6 +260,118 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Edit Asset Modal -->
+                <div id="editAssetModal" class="modal">
+                    <div class="modal-content">
+                        <span class="close">&times;</span>
+                        <h3>Edit Asset</h3>
+                        <form id="editAssetForm" class="two-column-form">
+                            <!-- Left Column -->
+                            <div class="form-column">
+                                <div class="form-group">
+                                    <label for="editAssetID">Asset ID:</label>
+                                    <input type="text" id="editAssetID" name="editAssetID" readonly>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editAssetType">Asset Type: <span class="required">*</span></label>
+                                    <select id="editAssetType" name="editAssetType" required>
+                                        <option value="">Select Asset Type</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editMake">Make:</label>
+                                    <input type="text" id="editMake" name="editMake">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editModel">Model:</label>
+                                    <input type="text" id="editModel" name="editModel">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editSerialNumber">Serial Number:</label>
+                                    <input type="text" id="editSerialNumber" name="editSerialNumber">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editOperatingSystem">Operating System:</label>
+                                    <select id="editOperatingSystem" name="editOperatingSystem">
+                                        <option value="">Select Operating System</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editProcessor">Processor:</label>
+                                    <input type="text" id="editProcessor" name="editProcessor">
+                                </div>
+                            </div>
+                            
+                            <!-- Right Column -->
+                            <div class="form-column">
+                                <div class="form-group">
+                                    <label for="editRAM">RAM:</label>
+                                    <input type="text" id="editRAM" name="editRAM">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editStorage">Storage:</label>
+                                    <input type="text" id="editStorage" name="editStorage">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editLocation">Location:</label>
+                                    <select id="editLocation" name="editLocation">
+                                        <option value="">Select Location</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editStatus">Status: <span class="required">*</span></label>
+                                    <select id="editStatus" name="editStatus" required>
+                                        <option value="">Select Status</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editAssignee">Assignee:</label>
+                                    <input type="text" id="editAssignee" name="editAssignee">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editCondition">Condition:</label>
+                                    <select id="editCondition" name="editCondition">
+                                        <option value="">Select Condition</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="editNotes">Notes:</label>
+                                    <textarea id="editNotes" name="editNotes" rows="3"></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Delete Confirmation Modal -->
+                <div id="deleteConfirmModal" class="modal">
+                    <div class="modal-content modal-sm">
+                        <h3>Confirm Delete</h3>
+                        <p>Are you sure you want to delete this asset? This action cannot be undone.</p>
+                        <div class="modal-actions">
+                            <button class="btn btn-danger" onclick="deleteAsset()">Delete</button>
+                            <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
       </main>
@@ -279,8 +392,6 @@
       <span class="close-notification">&times;</span>
     </div>
     
-    <!-- Include Chart.js library -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="script.js"></script>
   </body>
 </html> 
