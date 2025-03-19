@@ -54,7 +54,7 @@ router.put('/:id', updateAssetValidation, assetController.updateAsset);
 
 // DELETE /api/assets/:id - Delete an asset
 router.delete('/:id',
-  param('id').isInt(),
+  param('id').trim().notEmpty(),
   validateRequest,
   assetController.deleteAsset
 );

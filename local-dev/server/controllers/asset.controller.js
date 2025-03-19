@@ -129,7 +129,9 @@ exports.updateAsset = async (req, res) => {
 // Delete an asset
 exports.deleteAsset = async (req, res) => {
   try {
-    const asset = await Asset.findByPk(req.params.id);
+    const asset = await Asset.findOne({
+      where: { asset_id: req.params.id }
+    });
     
     if (!asset) {
       return res.status(404).json({

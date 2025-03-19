@@ -1,397 +1,227 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IT Asset Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
   </head>
   <body>
-    <div class="container">
-      <header>
-        <h1>IT Asset Tracker</h1>
-        <nav>
-          <ul>
-            <li><a href="#" class="nav-link active" data-section="dashboard">Dashboard</a></li>
-            <li><a href="#" class="nav-link" data-section="register">Register Asset</a></li>
-            <li><a href="#" class="nav-link" data-section="search">Search Assets</a></li>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">IT Asset Tracker</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a class="nav-link active" href="#" data-bs-toggle="tab" data-bs-target="#dashboard">Dashboard</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-bs-toggle="tab" data-bs-target="#register">Register Asset</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="#" data-bs-toggle="tab" data-bs-target="#search">Search Asset</a>
+            </li>
+            <li class="nav-item admin-only">
+              <a class="nav-link" href="#" data-bs-toggle="tab" data-bs-target="#users">User Management</a>
+            </li>
           </ul>
-        </nav>
-      </header>
-      
-      <main>
-        <!-- Dashboard Section -->
-        <section id="dashboard" class="section active">
-          <h2>Dashboard</h2>
-          <div class="dashboard-container">
-            <!-- Summary Cards Row -->
-            <div class="summary-cards">
-              <div class="metric-card total-assets">
-                <h3>Total Assets</h3>
-                <div class="metric-value" id="totalAssets">Loading...</div>
-              </div>
-              
-              <div class="metric-card available-assets">
-                <h3>Available</h3>
-                <div class="metric-value" id="availableAssets">Loading...</div>
-              </div>
-              
-              <div class="metric-card assigned-assets">
-                <h3>Assigned</h3>
-                <div class="metric-value" id="assignedAssets">Loading...</div>
-              </div>
-              
-              <div class="metric-card maintenance-assets">
-                <h3>In-Repair</h3>
-                <div class="metric-value" id="maintenanceAssets">Loading...</div>
-              </div>
-            </div>
-            
-            <!-- Updated export controls section -->
-            <div class="export-controls">
-                <button id="exportButton" class="btn btn-secondary">
-                    <i class="fas fa-download"></i> Export Assets
-                </button>
-                <div class="export-options hidden" id="exportOptions">
-                    <h4>Export Options</h4>
-                    <div class="export-options-list">
-                        <div class="export-option">
-                            <div class="radio-container">
-                                <input type="radio" id="exportAll" name="exportType" value="all" checked>
-                                <label for="exportAll">Export All Assets</label>
-                            </div>
-                        </div>
-                        <div class="export-option">
-                            <div class="radio-container">
-                                <input type="radio" id="exportFiltered" name="exportType" value="filtered">
-                                <label for="exportFiltered">Export Filtered Assets</label>
-                            </div>
-                            <div class="filter-options hidden">
-                                <select id="filterField" class="form-select">
-                                    <option value="Status">Status</option>
-                                    <option value="Location">Location</option>
-                                    <option value="Asset Type">Asset Type</option>
-                                </select>
-                                <select id="filterValue" class="form-select"></select>
-                            </div>
-                        </div>
-                        <button id="downloadCSV" class="btn btn-primary">
-                            <i class="fas fa-file-download"></i> Download CSV
-                        </button>
-                    </div>
+          <div class="d-flex align-items-center">
+            <div id="userInfo" class="text-light me-3"></div>
+            <button id="logoutButton" class="btn btn-outline-light">Logout</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container mt-4">
+      <div class="tab-content">
+        <!-- Dashboard Tab -->
+        <div class="tab-pane fade show active" id="dashboard">
+          <h2>Asset Overview</h2>
+          <div class="row mt-4">
+            <div class="col-md-3">
+              <div class="card bg-success text-white">
+                <div class="card-body">
+                  <h5 class="card-title">Available</h5>
+                  <h2 id="availableCount" class="card-text">0</h2>
                 </div>
+              </div>
             </div>
-            
-            <!-- Charts Grid -->
-            <div class="metric-charts">
-              <div class="chart-container">
-                <h3>Assets by Type</h3>
-                <canvas id="assetsByTypeChart"></canvas>
+            <div class="col-md-3">
+              <div class="card bg-info text-white">
+                <div class="card-body">
+                  <h5 class="card-title">In Use</h5>
+                  <h2 id="assignedCount" class="card-text">0</h2>
+                </div>
               </div>
-              
-              <div class="chart-container">
-                <h3>Assets by Status</h3>
-                <canvas id="assetsByStatusChart"></canvas>
+            </div>
+            <div class="col-md-3">
+              <div class="card bg-warning text-dark">
+                <div class="card-body">
+                  <h5 class="card-title">Under Maintenance</h5>
+                  <h2 id="inRepairCount" class="card-text">0</h2>
+                </div>
               </div>
-              
-              <div class="chart-container">
-                <h3>Assets by OS</h3>
-                <canvas id="assetsByOSChart"></canvas>
-              </div>
-              
-              <div class="chart-container">
-                <h3>Assets by Location</h3>
-                <canvas id="assetsByLocationChart"></canvas>
+            </div>
+            <div class="col-md-3">
+              <div class="card bg-danger text-white">
+                <div class="card-body">
+                  <h5 class="card-title">Retired</h5>
+                  <h2 id="retiredCount" class="card-text">0</h2>
+                </div>
               </div>
             </div>
           </div>
-        </section>
-        
-        <!-- Register Asset Section -->
-        <section id="register" class="section">
+
+          <div class="row mt-4">
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-body">
+                  <h5 class="card-title">Asset Status Distribution</h5>
+                  <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-body">
+                  <h5 class="card-title">Asset Type Distribution</h5>
+                  <div class="chart-container">
+                    <canvas id="typeChart"></canvas>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Register Asset Tab -->
+        <div class="tab-pane fade" id="register">
           <h2>Register New Asset</h2>
-          <form id="assetForm" class="two-column-form">
-            <!-- Left Column -->
-            <div class="form-column">
-              <div class="form-group">
-                <label for="assetID">Asset ID:</label>
-                <input type="text" id="assetID" name="assetID" readonly placeholder="Auto-generated">
-              </div>
-              
-              <div class="form-group">
-                <label for="assetType">Asset Type: <span class="required">*</span></label>
-                <select id="assetType" name="assetType" required>
-                  <option value="">Select Asset Type</option>
+          <form id="registerForm" class="mt-4">
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="assetType" class="form-label">Asset Type</label>
+                <select class="form-select" id="assetType" name="asset_type" required>
+                  <option value="">Select asset type</option>
                 </select>
               </div>
-              
-              <div class="form-group">
-                <label for="make">Make:</label>
-                <input type="text" id="make" name="make">
-              </div>
-              
-              <div class="form-group">
-                <label for="model">Model:</label>
-                <input type="text" id="model" name="model">
-              </div>
-              
-              <div class="form-group">
-                <label for="serialNumber">Serial Number:</label>
-                <input type="text" id="serialNumber" name="serialNumber">
-              </div>
-              
-              <div class="form-group">
-                <label for="operatingSystem">Operating System:</label>
-                <select id="operatingSystem" name="operatingSystem">
-                  <option value="">Select Operating System</option>
+              <div class="col-md-6 mb-3">
+                <label for="status" class="form-label">Status</label>
+                <select class="form-select" id="status" name="status" required>
+                  <option value="">Select status</option>
                 </select>
-              </div>
-              
-              <div class="form-group">
-                <label for="processor">Processor:</label>
-                <input type="text" id="processor" name="processor" placeholder="e.g., Intel Core i7-10700K">
               </div>
             </div>
-            
-            <!-- Right Column -->
-            <div class="form-column">
-              <div class="form-group">
-                <label for="ram">RAM:</label>
-                <input type="text" id="ram" name="ram" placeholder="e.g., 16GB DDR4">
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="make" class="form-label">Make</label>
+                <input type="text" class="form-control" id="make" name="make" required>
               </div>
-              
-              <div class="form-group">
-                <label for="storage">Storage:</label>
-                <input type="text" id="storage" name="storage" placeholder="e.g., 512GB SSD">
-              </div>
-              
-              <div class="form-group">
-                <label for="location">Location:</label>
-                <select id="location" name="location">
-                  <option value="">Select Location</option>
-                </select>
-              </div>
-              
-              <div class="form-group">
-                <label for="status">Status: <span class="required">*</span></label>
-                <select id="status" name="status" required>
-                  <option value="">Select Status</option>
-                </select>
-              </div>
-              
-              <div class="form-group">
-                <label for="assignee">Assignee:</label>
-                <input type="email" id="assignee" name="assignee" placeholder="email@example.com">
-              </div>
-              
-              <div class="form-group">
-                <label for="condition">Condition:</label>
-                <select id="condition" name="condition">
-                  <option value="">Select Condition</option>
-                </select>
-              </div>
-              
-              <div class="form-group">
-                <label for="notes">Notes:</label>
-                <textarea id="notes" name="notes" rows="3"></textarea>
+              <div class="col-md-6 mb-3">
+                <label for="model" class="form-label">Model</label>
+                <input type="text" class="form-control" id="model" name="model" required>
               </div>
             </div>
-            
-            <!-- Form Actions -->
-            <div class="form-actions">
-              <button type="submit" class="btn btn-primary">Register Asset</button>
-              <button type="reset" class="btn btn-secondary">Reset</button>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="serialNumber" class="form-label">Serial Number</label>
+                <input type="text" class="form-control" id="serialNumber" name="serial_number" required>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="operatingSystem" class="form-label">Operating System</label>
+                <select class="form-select" id="operatingSystem" name="operating_system">
+                  <option value="">Select operating system</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="location" class="form-label">Location</label>
+                <select class="form-select" id="location" name="location" required>
+                  <option value="">Select location</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="condition" class="form-label">Condition</label>
+                <select class="form-select" id="condition" name="condition" required>
+                  <option value="">Select condition</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="notes" class="form-label">Notes</label>
+              <textarea class="form-control" id="notes" name="notes" rows="3"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Register Asset</button>
+          </form>
+        </div>
+
+        <!-- Search Asset Tab -->
+        <div class="tab-pane fade" id="search">
+          <h2>Search Assets</h2>
+          <form id="searchForm" class="mt-4">
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label for="searchField" class="form-label">Search By</label>
+                <select class="form-select" id="searchField" name="field" required>
+                  <option value="Asset ID">Asset ID</option>
+                  <option value="Serial Number">Serial Number</option>
+                  <option value="Location">Location</option>
+                  <option value="Status">Status</option>
+                  <option value="Assignee">Assignee</option>
+                  <option value="Condition">Condition</option>
+                </select>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="searchValue" class="form-label">Search Value</label>
+                <input type="text" class="form-control" id="searchValue" name="value" required>
+              </div>
+              <div class="col-md-2 mb-3">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary w-100">Search</button>
+              </div>
             </div>
           </form>
-        </section>
-        
-        <!-- Search Assets Section -->
-        <section id="search" class="section">
-            <h2>Search Assets</h2>
-            <div class="search-container">
-                <div class="search-controls">
-                    <div class="search-field">
-                        <select id="searchField">
-                            <option value="">Select Search Field</option>
-                            <option value="Asset ID">Asset ID</option>
-                            <option value="Serial Number">Serial Number</option>
-                            <option value="Location">Location</option>
-                            <option value="Status">Status</option>
-                            <option value="Assignee">Assignee</option>
-                            <option value="Condition">Condition</option>
-                        </select>
-                    </div>
-                    <div class="search-input">
-                        <input type="text" id="searchValue" placeholder="Enter search value">
-                        <button id="searchButton" class="btn btn-primary">Search</button>
-                    </div>
-                </div>
-                
-                <div class="search-results">
-                    <div id="noResults" class="no-results hidden">No assets found matching your search criteria.</div>
-                    <div id="resultsTable" class="results-table hidden">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Asset ID</th>
-                                    <th>Type</th>
-                                    <th>Make</th>
-                                    <th>Model</th>
-                                    <th>Serial Number</th>
-                                    <th>Status</th>
-                                    <th>Location</th>
-                                    <th>Assignee</th>
-                                    <th>Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="searchResults">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                
-                <!-- Asset Details Modal -->
-                <div id="assetModal" class="modal">
-                    <div class="modal-content">
-                        <span class="close">&times;</span>
-                        <h3>Asset Details</h3>
-                        <div id="assetDetails" class="asset-details">
-                            <!-- Details will be populated by JavaScript -->
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Edit Asset Modal -->
-                <div id="editAssetModal" class="modal">
-                    <div class="modal-content">
-                        <span class="close">&times;</span>
-                        <h3>Edit Asset</h3>
-                        <form id="editAssetForm" class="two-column-form">
-                            <!-- Left Column -->
-                            <div class="form-column">
-                                <div class="form-group">
-                                    <label for="editAssetID">Asset ID:</label>
-                                    <input type="text" id="editAssetID" name="editAssetID" readonly>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editAssetType">Asset Type: <span class="required">*</span></label>
-                                    <select id="editAssetType" name="editAssetType" required>
-                                        <option value="">Select Asset Type</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editMake">Make:</label>
-                                    <input type="text" id="editMake" name="editMake">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editModel">Model:</label>
-                                    <input type="text" id="editModel" name="editModel">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editSerialNumber">Serial Number:</label>
-                                    <input type="text" id="editSerialNumber" name="editSerialNumber">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editOperatingSystem">Operating System:</label>
-                                    <select id="editOperatingSystem" name="editOperatingSystem">
-                                        <option value="">Select Operating System</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editProcessor">Processor:</label>
-                                    <input type="text" id="editProcessor" name="editProcessor">
-                                </div>
-                            </div>
-                            
-                            <!-- Right Column -->
-                            <div class="form-column">
-                                <div class="form-group">
-                                    <label for="editRAM">RAM:</label>
-                                    <input type="text" id="editRAM" name="editRAM">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editStorage">Storage:</label>
-                                    <input type="text" id="editStorage" name="editStorage">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editLocation">Location:</label>
-                                    <select id="editLocation" name="editLocation">
-                                        <option value="">Select Location</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editStatus">Status: <span class="required">*</span></label>
-                                    <select id="editStatus" name="editStatus" required>
-                                        <option value="">Select Status</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editAssignee">Assignee:</label>
-                                    <input type="text" id="editAssignee" name="editAssignee">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editCondition">Condition:</label>
-                                    <select id="editCondition" name="editCondition">
-                                        <option value="">Select Condition</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label for="editNotes">Notes:</label>
-                                    <textarea id="editNotes" name="editNotes" rows="3"></textarea>
-                                </div>
-                            </div>
-                            
-                            <div class="form-actions">
-                                <button type="submit" class="btn btn-primary">Save Changes</button>
-                                <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+          <div id="searchResults" class="mt-4"></div>
+        </div>
 
-                <!-- Delete Confirmation Modal -->
-                <div id="deleteConfirmModal" class="modal">
-                    <div class="modal-content modal-sm">
-                        <h3>Confirm Delete</h3>
-                        <p>Are you sure you want to delete this asset? This action cannot be undone.</p>
-                        <div class="modal-actions">
-                            <button class="btn btn-danger" onclick="deleteAsset()">Delete</button>
-                            <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-      </main>
-      
-      <footer>
-        <p>IT Asset Tracker &copy; <span id="currentYear"></span></p>
-      </footer>
+        <!-- User Management Tab (Admin Only) -->
+        <div class="tab-pane fade" id="users">
+          <h2>User Management</h2>
+          <div class="d-flex justify-content-end mb-3">
+            <button class="btn btn-primary" onclick="showAddUserForm()">Add New User</button>
+          </div>
+          <div id="usersList"></div>
+        </div>
+      </div>
     </div>
-    
-    <!-- Loading overlay -->
-    <div id="loadingOverlay" class="loading-overlay">
-      <div class="spinner"></div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="assetModal" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content"></div>
+      </div>
     </div>
-    
-    <!-- Success notification -->
-    <div id="notification" class="notification">
-      <span id="notificationMessage"></span>
-      <span class="close-notification">&times;</span>
-    </div>
-    
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="auth.js"></script>
+    <script src="users.js"></script>
     <script src="script.js"></script>
   </body>
 </html> 

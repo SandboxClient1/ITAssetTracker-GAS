@@ -70,8 +70,12 @@ const Asset = sequelize.define('Asset', {
         }
     },
     assignee: {
-        type: DataTypes.STRING(100),
-        allowNull: true
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'users',
+            key: 'id'
+        }
     },
     condition: {
         type: DataTypes.STRING(50),
@@ -83,6 +87,22 @@ const Asset = sequelize.define('Asset', {
     notes: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    created_by: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'users',
+            key: 'id'
+        }
+    },
+    updated_by: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'users',
+            key: 'id'
+        }
     }
 }, {
     tableName: 'assets',

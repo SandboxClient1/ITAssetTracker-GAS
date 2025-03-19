@@ -1,0 +1,23 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "Nasirhaidary25",
+    "database": "it_assets",
+    "host": "127.0.0.1",
+    "dialect": "postgres"
+  },
+  "test": {
+    "username": "postgres",
+    "password": "Nasirhaidary25",
+    "database": "it_assets_test",
+    "host": "127.0.0.1",
+    "dialect": "postgres"
+  },
+  "production": {
+    "username": "postgres",
+    "password": "Nasirhaidary25",
+    "database": "it_assets_prod",
+    "host": "127.0.0.1",
+    "dialect": "postgres"
+  }
+}
